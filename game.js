@@ -1,0 +1,216 @@
+const canvas = document.getElementById('pingPongCanvas');
+const ctx = canvas.getContext('2d');
+
+const ball = {
+    x: canvas.width / 2,
+    y: canvas.height / 2,
+    radius: 10,
+    speed: 5,
+    dx: 5,
+    dy: 5,
+};
+
+const paddles = [
+    {
+        width: 10,
+        height: 100,
+        x: 10,
+        y: canvas.height / 2 - 50,
+        speed: 10,
+        score: 0,
+        upPressed: false,
+        downPressed: false,
+    },
+    {
+        width: 10,
+        height: 100,
+        x: canvas.width - 20,
+        y: canvas.height / 2 - 50,
+        speed: 4,
+        score: 0,
+    },
+];
+
+let gameOver = true; // Game starts as not active
+let winningScore = 5; // Increase the winning score
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowUp') {
+        paddles[0].upPressed = true;
+    } else if (e.key === 'ArrowDown') {
+        paddles[0].downPressed = true;
+    } else if (e.key === ' ') { // Spacebar to start
+        if (gameOver) {
+            startGame();
+        }
+    }
+});
+
+document.addEventListener('keyup', (e) => {
+    if (e.key === 'ArrowUp') {
+        paddles[0].upPressed = false;
+    } else if (e.key === 'ArrowDown') {
+        paddles[0].downPressed = false;
+    }
+});
+
+function drawBall() {
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+    ctx.fillStyle = 'white';
+    ctx.fill();
+    ctx.closePath();
+}
+
+function drawPaddle(paddle) {
+    ctx.beginPath();
+    ctx.rect(paddle.x, paddle.y, paddle.width, paddle.height);
+    ctx.fillStyle = 'white';
+    ctx.fill();
+    ctx.closePath();
+}
+
+function drawScore() {
+    ctx.font = '30px Arial';
+    ctx.fillStyle = 'white';
+    ctx.fillText('Player 1: ' + paddles[0].score, 20, 40);
+    ctx.fillText('Player 2: ' + paddles[1].score, canvas.width - 180, 40);
+}
+
+function drawInstructions() {
+    ctx.font = '20px Arial';
+    ctx.fillStyle = 'white';
+    ctx.fillText('Press SPACE to Start', canvas.width / 2 - 100, canvas.height / 2);
+}
+
+function drawWinnerAnnouncement(winner) {
+    const winnerAnnouncement = document.getElementById('winnerAnnouncement');
+    const winnerName = document.getElementById('winnerName');
+    winnerName.textContent = winner;
+    winnerAnnouncement.style.display = 'block';
+}
+
+// Explosion animation
+function drawExplosion(x, y) {
+    for (let i = 0; i < 30; i++) {
+        const angle = (Math.PI / 180) * (i * 12);
+        const radius = Math.random() * 20 + 10;
+        const explosionX = x + Math.cos(angle) * radius;
+        const explosionY = y + Math.sin(angle) * radius;
+        ctx.beginPath();
+        ctx.arc(explosionX, explosionY, 3, 0, Math.PI * 2);
+        ctx.fillStyle = 'red';
+        ctx.fill();
+        ctx.closePath();
+    }
+}
+
+function update() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    drawBall();
+    drawPaddle(paddles[0]);
+    drawPaddle(paddles[1]);
+    drawScore();
+
+    if (gameOver) {
+        drawInstructions();
+        requestAnimationFrame(update);
+        return;
+    }
+
+    ball.x += ball.dx;
+    ball.y += ball.dy;
+
+    if (ball.y - ball.radius < 0 || ball.y + ball.radius > canvas.height) {
+        ball.dy *= -1;
+    }
+
+    if (ball.x - ball.radius < 0) {
+        // Player 2 scores a point
+        paddles[1].score++;
+        if (paddles[1].score >= winningScore) {
+            gameOver = true;
+            drawExplosion(ball.x, ball.y);
+            setTimeout(() => {
+                drawWinnerAnnouncement('Player 2');
+            }, 1000); // Display winner announcement after the explosion
+        } else {
+            resetBall();
+        }
+    } else if (ball.x + ball.radius > canvas.width) {
+        // Player 1 scores a point
+        paddles[0].score++;
+        if (paddles[0].score >= winningScore) {
+            gameOver = true;
+            drawExplosion(ball.x, ball.y);
+            setTimeout(() => {
+                drawWinnerAnnouncement('Player 1');
+            }, 1000); // Display winner announcement after the explosion
+        } else {
+            resetBall();
+        }
+    }
+
+    // Ball and paddle collision detection for Player 1
+    if (
+        ball.x - ball.radius < paddles[0].x + paddles[0].width &&
+        ball.x - ball.radius > paddles[0].x &&
+        ball.y > paddles[0].y &&
+        ball.y < paddles[0].y + paddles[0].height
+    ) {
+        ball.dx *= -1;
+    }
+
+    // Ball and paddle collision detection for Player 2
+    if (
+        ball.x + ball.radius > paddles[1].x &&
+        ball.x + ball.radius < paddles[1].x + paddles[1].width &&
+        ball.y > paddles[1].y &&
+        ball.y < paddles[1].y + paddles[1].height
+    ) {
+        ball.dx *= -1;
+    }
+
+    // Update Player 2 paddle position based on ball position
+    const paddleCenter = paddles[1].y + paddles[1].height / 2;
+    if (ball.x > canvas.width / 2) {
+        if (ball.y > paddleCenter) {
+            paddles[1].y += paddles[1].speed;
+        } else {
+            paddles[1].y -= paddles[1].speed;
+        }
+    }
+
+    // Update Player 1 paddle position
+    if (paddles[0].upPressed) {
+        paddles[0].y -= paddles[0].speed;
+    }
+    if (paddles[0].downPressed) {
+        paddles[0].y += paddles[0].speed;
+    }
+
+    // Ensure paddles stay within the canvas bounds
+    paddles[0].y = Math.max(0, Math.min(paddles[0].y, canvas.height - paddles[0].height));
+    paddles[1].y = Math.max(0, Math.min(paddles[1].y, canvas.height - paddles[1].height));
+
+    requestAnimationFrame(update);
+}
+
+function startGame() {
+    gameOver = false;
+    paddles[0].score = 0;
+    paddles[1].score = 0;
+    resetBall();
+    const winnerAnnouncement = document.getElementById('winnerAnnouncement');
+    winnerAnnouncement.style.display = 'none';
+}
+
+function resetBall() {
+    ball.x = canvas.width / 2;
+    ball.y = canvas.height / 2;
+    ball.dx = ball.speed;
+    ball.dy = ball.speed;
+}
+
+update();
